@@ -3,16 +3,25 @@
 echo "##### Create SQS queues #####"
 awslocal \
   sqs create-queue \
-  --queue-name dispatch_event_processor
+  --queue-name dispatch_event_processor_DLQ
 
 awslocal \
   sqs create-queue \
-  --queue-name dispatch_event_processor_DLQ
+  --queue-name dispatch_event_processor \
+  --attributes '{"RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:000000000000:dispatch_event_processor_DLQ\",\"maxReceiveCount\":\"3\"}"}'
 
 awslocal \
   sqs create-queue \
   --queue-name dispatch_event_processor_retry \
   --attributes '{"RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:000000000000:dispatch_event_processor_DLQ\",\"maxReceiveCount\":\"3\"}"}'
+
+echo "##### Create table in DynamoDB #####"
+awslocal dynamodb create-table \
+    --table-name dispatched_events \
+    --key-schema AttributeName=id,KeyType=HASH \
+    --attribute-definitions AttributeName=id,AttributeType=S \
+    --billing-mode PAY_PER_REQUEST \
+    --region us-east-1
 
 echo "##### Create admin-role #####"
 awslocal \

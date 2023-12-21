@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/vitorbgouveia/go-event-processor/internal/repository"
 	"github.com/vitorbgouveia/go-event-processor/pkg"
 	"github.com/vitorbgouveia/go-event-processor/pkg/contracts"
 	"github.com/vitorbgouveia/go-event-processor/pkg/messagebroker"
@@ -20,6 +21,7 @@ type dispatchEventProcess struct {
 	msgBrotker        messagebroker.Broker
 	queueRetryProcess string
 	queueDLQProcess   string
+	repo              repository.DispatchedEvents
 }
 
 type sendEventToRetryParams struct {
@@ -43,11 +45,12 @@ type DispatchEventProcess struct {
 	MsgBroker         messagebroker.Broker
 	QueueRetryProcess string
 	QueueDLQProcess   string
+	Repo              repository.DispatchedEvents
 }
 
 func NewDispatchEventProcessor(d *DispatchEventProcess) DispatchEventProcessor {
 	return &dispatchEventProcess{
-		d.Logger, d.MsgBroker, d.QueueRetryProcess, d.QueueDLQProcess,
+		d.Logger, d.MsgBroker, d.QueueRetryProcess, d.QueueDLQProcess, d.Repo,
 	}
 }
 
@@ -97,9 +100,23 @@ func (s *dispatchEventProcess) ProcessEvents(ctx context.Context, dataRaw interf
 					return
 				}
 
+				if err := s.repo.Insert(ctx, messageBody); err != nil {
+					if retryErr := s.sendEventToRetry(ctx, sendEventToRetryParams{
+						messageID: event.MessageId, eventBody: event.Body, eventARN: event.EventARN,
+					}, err); retryErr != nil {
+						err = errors.Join(err, retryErr)
+						s.logger.Errorw("fail to send event to retry",
+							zap.String(pkg.MessageIDKey, event.MessageId), zap.String(pkg.EventBodyKey, event.Body), zap.Error(err))
+						processResult <- err
+					}
+
+					processResult <- nil
+				}
+
 				time.Sleep(3 * time.Second)
 				s.logger.Infow("processed dispatched event",
 					zap.String(pkg.MessageIDKey, event.MessageId), zap.Any(pkg.EventBodyKey, messageBody))
+				processResult <- nil
 			}
 		}
 
