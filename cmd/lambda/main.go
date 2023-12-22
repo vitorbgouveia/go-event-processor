@@ -23,7 +23,10 @@ func init() {
 }
 
 // aws sqs send-message --endpoint-url=http://localhost:4566 --queue-url http://localhost:4576/000000000000/dispatch_event_processor --region us-east-1 --message-body '{Test Message!}'
-// aws sqs send-message --endpoint-url=http://localhost:4566 --queue-url http://localhost:4576/000000000000/dispatch_event_processor --region us-east-1 --message-body '{"context": "ok", "type": "ok", "tenant": "ok", "event_data": "ok"}'
+/*
+ aws sqs send-message --endpoint-url=http://localhost:4566 --queue-url http://localhost:4576/000000000000/dispatch_event_processor --region us-east-1 \
+ --message-body '{"context": "ok", "type": "ok", "tenant": "2e7d5843-a6db-4909-8add-79258783a524", "data": "{\"ok\": \"test\"}"}'
+*/
 
 func main() {
 	ctx := context.Background()

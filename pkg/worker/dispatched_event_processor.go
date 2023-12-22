@@ -70,7 +70,10 @@ func (s *dispatchedEventProcessor) ProcessEvents(ctx context.Context, event *mod
 					return
 				}
 
-				if err := s.repo.Insert(ctx, messageBody); err != nil {
+				if err := s.repo.Insert(ctx, repository.EventInsertInput{
+					EventId: record.MessageId, Context: messageBody.Context, Type: messageBody.Tenant,
+					Tenant: messageBody.Tenant, Data: messageBody.Data,
+				}); err != nil {
 					if retryErr := s.sendEventToRetry(ctx, record, err); retryErr != nil {
 						processResult <- errors.Join(err, retryErr)
 					}

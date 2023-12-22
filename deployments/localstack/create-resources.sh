@@ -18,8 +18,8 @@ awslocal \
 echo "##### Create table in DynamoDB #####"
 awslocal dynamodb create-table \
     --table-name dispatched_events \
-    --key-schema AttributeName=id,KeyType=HASH \
-    --attribute-definitions AttributeName=id,AttributeType=S \
+    --key-schema AttributeName=EventId,KeyType=HASH \
+    --attribute-definitions AttributeName=EventId,AttributeType=S \
     --billing-mode PAY_PER_REQUEST \
     --region us-east-1
 
