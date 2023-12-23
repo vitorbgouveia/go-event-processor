@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/vitorbgouveia/go-event-processor/internal/models"
 	"github.com/vitorbgouveia/go-event-processor/internal/repository"
@@ -53,7 +52,7 @@ func (s *dispatchedEventProcessor) ProcessEvents(ctx context.Context, event *mod
 		for _, record := range event.Records {
 			select {
 			case <-cancelProcess:
-				if retryErr := s.sendEventToRetry(ctx, record, ErrInterruptionProcess); retryErr != nil {
+				if retryErr := s.sendEventToRetry(record, ErrInterruptionProcess); retryErr != nil {
 					processResult <- errors.Join(ErrInterruptionProcess, retryErr)
 				}
 
@@ -62,7 +61,7 @@ func (s *dispatchedEventProcessor) ProcessEvents(ctx context.Context, event *mod
 			default:
 				var messageBody models.EventMessageBody
 				if err := s.parseMessageBody(record.Body, &messageBody); err != nil {
-					if retryErr := s.sendEventToRetry(ctx, record, err); retryErr != nil {
+					if retryErr := s.sendEventToRetry(record, err); retryErr != nil {
 						processResult <- errors.Join(err, retryErr)
 					}
 
@@ -70,18 +69,17 @@ func (s *dispatchedEventProcessor) ProcessEvents(ctx context.Context, event *mod
 					return
 				}
 
-				if err := s.repo.Insert(ctx, repository.EventInsertInput{
-					EventId: record.MessageId, Context: messageBody.Context, Type: messageBody.Tenant,
+				if err := s.repo.Insert(repository.EventInsertInput{
+					EventId: messageBody.EventId, Context: messageBody.Context, Type: messageBody.Type,
 					Tenant: messageBody.Tenant, Data: messageBody.Data,
 				}); err != nil {
-					if retryErr := s.sendEventToRetry(ctx, record, err); retryErr != nil {
+					if retryErr := s.sendEventToRetry(record, err); retryErr != nil {
 						processResult <- errors.Join(err, retryErr)
 					}
 
 					processResult <- nil
 				}
 
-				time.Sleep(3 * time.Second)
 				slog.Info("processed dispatched event",
 					slog.String(logger.MessageIDKey, record.MessageId), slog.Any(logger.EventBodyKey, messageBody))
 				processResult <- nil
@@ -107,18 +105,18 @@ func (s *dispatchedEventProcessor) parseMessageBody(message string, messageBody 
 	return messageBody.Validate()
 }
 
-func (s *dispatchedEventProcessor) sendEventToRetry(ctx context.Context, event models.EventRecord, errReason error) error {
+func (s *dispatchedEventProcessor) sendEventToRetry(event models.EventRecord, errReason error) error {
 	if strings.Contains(event.EventARN, s.queueRetryProcess) {
 		return ErrEventSentToRetryAgain
 	}
 
-	if err := s.msgBrotker.SendMessage(ctx, aws.SendMessageInput{
+	if err := s.msgBrotker.SendMessage(aws.SendMessageInput{
 		QueueName:   s.queueRetryProcess,
 		MessageID:   event.MessageId,
 		MessageBody: event.Body,
 	},
 	); err != nil {
-		return nil
+		return err
 	}
 
 	slog.Warn("event sent to retry", slog.String(logger.MessageIDKey, event.MessageId),

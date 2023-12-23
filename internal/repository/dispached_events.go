@@ -1,8 +1,6 @@
 package repository
 
 import (
-	"context"
-
 	"github.com/vitorbgouveia/go-event-processor/pkg/aws"
 )
 
@@ -11,7 +9,7 @@ type (
 		persistence aws.Persistence
 	}
 	DispatchedEvents interface {
-		Insert(ctx context.Context, event EventInsertInput) error
+		Insert(event EventInsertInput) error
 	}
 
 	EventInsertInput struct {
@@ -27,12 +25,12 @@ const (
 	tableName = "dispatched_events"
 )
 
-func NewDispatchedEvents(ctx context.Context, persistence aws.Persistence) DispatchedEvents {
+func NewDispatchedEvents(persistence aws.Persistence) DispatchedEvents {
 	return &dispatchedEvents{persistence}
 }
 
-func (s *dispatchedEvents) Insert(ctx context.Context, event EventInsertInput) error {
-	return s.persistence.Insert(ctx, aws.InsertInput{
+func (s *dispatchedEvents) Insert(event EventInsertInput) error {
+	return s.persistence.Insert(aws.InsertInput{
 		TableName:   tableName,
 		StructValue: event,
 	})

@@ -1,22 +1,24 @@
 package aws
 
 import (
-	"context"
+	"errors"
 	"log/slog"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 	"github.com/vitorbgouveia/go-event-processor/pkg/logger"
 )
 
 type (
 	persistence struct {
-		client *dynamodb.Client
+		client dynamodbiface.DynamoDBAPI
 	}
 
 	Persistence interface {
-		Insert(ctx context.Context, i InsertInput) error
+		Insert(i InsertInput) error
 	}
 
 	InsertInput struct {
@@ -25,23 +27,32 @@ type (
 	}
 )
 
-func NewPersistence(cfg aws.Config) Persistence {
-	client := dynamodb.NewFromConfig(cfg)
+var (
+	ErrInvalidInsertInput = errors.New("input structValue is invalid, could not parse to map")
+	ErrInvalidTableName   = errors.New("input table name is invalid")
+)
+
+func NewPersistence(sess *session.Session) Persistence {
+	client := dynamodb.New(sess)
 	return &persistence{client}
 }
 
-func (s *persistence) Insert(ctx context.Context, i InsertInput) error {
-	newItem, err := attributevalue.MarshalMap(i.StructValue)
-	if err != nil {
-		return err
+func (s *persistence) Insert(i InsertInput) error {
+	newItem, err := dynamodbattribute.MarshalMap(i.StructValue)
+	if err != nil || len(newItem) == 0 {
+		return errors.Join(err, ErrInvalidInsertInput)
 	}
 
-	if _, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
+	if i.TableName == "" {
+		return ErrInvalidTableName
+	}
+
+	if _, err := s.client.PutItem(&dynamodb.PutItemInput{
 		Item:      newItem,
 		TableName: aws.String(i.TableName),
 	}); err != nil {
 		slog.Error("fail to insert new item", slog.String(logger.TableNameKey, i.TableName),
-			slog.Any(logger.EventBodyKey, i.StructValue), slog.Any("err", err))
+			slog.Any(logger.EventBodyKey, newItem), slog.Any("err", err))
 		return err
 	}
 

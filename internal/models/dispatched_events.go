@@ -17,6 +17,7 @@ type (
 	}
 
 	EventMessageBody struct {
+		EventId string `json:"event_id"`
 		Context string `json:"context"`
 		Type    string `json:"type"`
 		Tenant  string `json:"tenant"`
@@ -30,6 +31,7 @@ type (
 
 func (s *EventMessageBody) Validate() error {
 	return validation.ValidateStruct(s,
+		validation.Field(&s.EventId, validation.Required, is.UUID),
 		validation.Field(&s.Context, validation.Required),
 		validation.Field(&s.Type, validation.Required),
 		validation.Field(&s.Tenant, validation.Required, is.UUID),

@@ -1,18 +1,21 @@
 package aws
 
 import (
-	"context"
 	"log/slog"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/go-ozzo/ozzo-validation/v4/is"
 
 	"github.com/vitorbgouveia/go-event-processor/pkg/logger"
 )
 
 type (
 	messagebroker struct {
-		client *sqs.Client
+		client sqsiface.SQSAPI
 	}
 
 	SendMessageInput struct {
@@ -22,17 +25,21 @@ type (
 	}
 
 	MessageBroker interface {
-		SendMessage(ctx context.Context, p SendMessageInput) error
+		SendMessage(p SendMessageInput) error
 	}
 )
 
-func NewMessageBroker(cfg aws.Config) MessageBroker {
-	client := sqs.NewFromConfig(cfg)
+func NewMessageBroker(sess *session.Session) MessageBroker {
+	client := sqs.New(sess)
 	return &messagebroker{client}
 }
 
-func (s *messagebroker) SendMessage(ctx context.Context, p SendMessageInput) error {
-	urlOutput, err := s.client.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{
+func (s *messagebroker) SendMessage(p SendMessageInput) error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+
+	urlOutput, err := s.client.GetQueueUrl(&sqs.GetQueueUrlInput{
 		QueueName: aws.String(p.QueueName),
 	})
 	if err != nil {
@@ -40,7 +47,7 @@ func (s *messagebroker) SendMessage(ctx context.Context, p SendMessageInput) err
 		return err
 	}
 
-	_, err = s.client.SendMessage(ctx, &sqs.SendMessageInput{
+	_, err = s.client.SendMessage(&sqs.SendMessageInput{
 		MessageBody: aws.String(p.MessageBody),
 		QueueUrl:    urlOutput.QueueUrl,
 	})
@@ -51,4 +58,12 @@ func (s *messagebroker) SendMessage(ctx context.Context, p SendMessageInput) err
 	}
 
 	return nil
+}
+
+func (s *SendMessageInput) Validate() error {
+	return validation.ValidateStruct(s,
+		validation.Field(&s.QueueName, validation.Required),
+		validation.Field(&s.MessageID, validation.Required, is.UUID),
+		validation.Field(&s.MessageBody, validation.Required, is.JSON),
+	)
 }
