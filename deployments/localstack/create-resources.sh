@@ -15,6 +15,12 @@ awslocal \
   --queue-name dispatch_event_processor_retry \
   --attributes '{"RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:000000000000:dispatch_event_processor_DLQ\",\"maxReceiveCount\":\"3\"}"}'
 
+echo "##### Create SNS topics #####"
+awslocal \
+  sns create-topic \
+  --name order-creation-events \
+  --region us-east-1
+
 echo "##### Create table in DynamoDB #####"
 awslocal dynamodb create-table \
     --table-name dispatched_events \

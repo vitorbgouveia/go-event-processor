@@ -5,10 +5,10 @@ import (
 )
 
 type (
-	dispatchedEvents struct {
+	events struct {
 		persistence aws.Persistence
 	}
-	DispatchedEvents interface {
+	Events interface {
 		Insert(event EventInsertInput) error
 	}
 
@@ -25,11 +25,11 @@ const (
 	tableName = "dispatched_events"
 )
 
-func NewDispatchedEvents(persistence aws.Persistence) DispatchedEvents {
-	return &dispatchedEvents{persistence}
+func NewDispatchedEvents(persistence aws.Persistence) Events {
+	return &events{persistence}
 }
 
-func (s *dispatchedEvents) Insert(event EventInsertInput) error {
+func (s *events) Insert(event EventInsertInput) error {
 	return s.persistence.Insert(aws.InsertInput{
 		TableName:   tableName,
 		StructValue: event,

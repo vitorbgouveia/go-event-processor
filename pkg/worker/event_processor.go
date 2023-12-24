@@ -14,22 +14,20 @@ import (
 )
 
 type (
-	dispatchedEventProcessor struct {
+	eventProcessor struct {
 		msgBrotker        aws.MessageBroker
 		queueRetryProcess string
-		queueDLQProcess   string
-		repo              repository.DispatchedEvents
+		repo              repository.Events
 	}
 
-	DispatchedEventProcessor interface {
-		ProcessEvents(ctx context.Context, event *models.DispatchedEvent, cancel <-chan struct{}) error
+	EventProcessor interface {
+		ProcessEvents(ctx context.Context, event *models.EventInput, cancel <-chan struct{}) error
 	}
 
-	DispatchedEventProcessorInput struct {
+	EventProcessorInput struct {
 		MsgBroker         aws.MessageBroker
 		QueueRetryProcess string
-		QueueDLQProcess   string
-		Repo              repository.DispatchedEvents
+		Repo              repository.Events
 	}
 )
 
@@ -39,21 +37,22 @@ var (
 	ErrEventSentToRetryAgain = errors.New("message has already been sent for retry")
 )
 
-func NewDispatchedEventProcessor(d *DispatchedEventProcessorInput) DispatchedEventProcessor {
-	return &dispatchedEventProcessor{
-		d.MsgBroker, d.QueueRetryProcess, d.QueueDLQProcess, d.Repo,
+func NewDispatchedEventProcessor(d *EventProcessorInput) EventProcessor {
+	return &eventProcessor{
+		msgBrotker: d.MsgBroker, queueRetryProcess: d.QueueRetryProcess, repo: d.Repo,
 	}
 }
 
-func (s *dispatchedEventProcessor) ProcessEvents(ctx context.Context, event *models.DispatchedEvent, cancel <-chan struct{}) error {
+func (s *eventProcessor) ProcessEvents(ctx context.Context, event *models.EventInput, cancel <-chan struct{}) error {
 	result := make(chan error)
 
 	go func(processResult chan<- error, cancelProcess <-chan struct{}) {
 		for _, record := range event.Records {
 			select {
 			case <-cancelProcess:
-				if retryErr := s.sendEventToRetry(record, ErrInterruptionProcess); retryErr != nil {
+				if retryErr := s.sendEventToRetry(ctx, record, ErrInterruptionProcess); retryErr != nil {
 					processResult <- errors.Join(ErrInterruptionProcess, retryErr)
+					return
 				}
 
 				processResult <- nil
@@ -61,10 +60,12 @@ func (s *dispatchedEventProcessor) ProcessEvents(ctx context.Context, event *mod
 			default:
 				var messageBody models.EventMessageBody
 				if err := s.parseMessageBody(record.Body, &messageBody); err != nil {
-					if retryErr := s.sendEventToRetry(record, err); retryErr != nil {
-						processResult <- errors.Join(err, retryErr)
+					if rejectErr := s.msgBrotker.PublishRejectedEvent(ctx, record.Body, err); rejectErr != nil {
+						processResult <- errors.Join(err, rejectErr)
+						return
 					}
 
+					slog.Warn("event rejected, notification sent", slog.String(logger.EventBodyKey, record.Body), slog.Any("err", err))
 					processResult <- nil
 					return
 				}
@@ -73,14 +74,26 @@ func (s *dispatchedEventProcessor) ProcessEvents(ctx context.Context, event *mod
 					EventId: messageBody.EventId, Context: messageBody.Context, Type: messageBody.Type,
 					Tenant: messageBody.Tenant, Data: messageBody.Data,
 				}); err != nil {
-					if retryErr := s.sendEventToRetry(record, err); retryErr != nil {
+					if retryErr := s.sendEventToRetry(ctx, record, err); retryErr != nil {
 						processResult <- errors.Join(err, retryErr)
+						return
 					}
 
 					processResult <- nil
+					return
 				}
 
-				slog.Info("processed dispatched event",
+				if err := s.msgBrotker.PublishValidEvent(ctx, record.Body); err != nil {
+					if retryErr := s.sendEventToRetry(ctx, record, err); retryErr != nil {
+						processResult <- errors.Join(err, retryErr)
+						return
+					}
+
+					processResult <- nil
+					return
+				}
+
+				slog.Info("processed dispatched event", slog.String(logger.EventIdKey, messageBody.EventId),
 					slog.String(logger.MessageIDKey, record.MessageId), slog.Any(logger.EventBodyKey, messageBody))
 				processResult <- nil
 			}
@@ -97,7 +110,7 @@ func (s *dispatchedEventProcessor) ProcessEvents(ctx context.Context, event *mod
 	return nil
 }
 
-func (s *dispatchedEventProcessor) parseMessageBody(message string, messageBody *models.EventMessageBody) error {
+func (s *eventProcessor) parseMessageBody(message string, messageBody *models.EventMessageBody) error {
 	if err := json.Unmarshal([]byte(message), &messageBody); err != nil {
 		return err
 	}
@@ -105,14 +118,13 @@ func (s *dispatchedEventProcessor) parseMessageBody(message string, messageBody 
 	return messageBody.Validate()
 }
 
-func (s *dispatchedEventProcessor) sendEventToRetry(event models.EventRecord, errReason error) error {
+func (s *eventProcessor) sendEventToRetry(ctx context.Context, event models.EventRecord, errReason error) error {
 	if strings.Contains(event.EventARN, s.queueRetryProcess) {
 		return ErrEventSentToRetryAgain
 	}
 
-	if err := s.msgBrotker.SendMessage(aws.SendMessageInput{
+	if err := s.msgBrotker.SendToQueue(ctx, aws.SendToQueueInput{
 		QueueName:   s.queueRetryProcess,
-		MessageID:   event.MessageId,
 		MessageBody: event.Body,
 	},
 	); err != nil {
@@ -123,24 +135,3 @@ func (s *dispatchedEventProcessor) sendEventToRetry(event models.EventRecord, er
 		slog.String(logger.QueueNameKey, s.queueRetryProcess), slog.String(logger.EventBodyKey, event.Body), slog.Any("err", errReason))
 	return nil
 }
-
-// func (s *dispatchEventProcessor) sendEventToDeadLetter(ctx context.Context, data interface{}) error {
-// 	bBody, err := json.Marshal(data)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	if err := s.msgBrotker.SendMessage(ctx,
-// 		aws.SendMessageInput{
-// 			QueueName:   s.queueDLQProcess,
-// 			MessageID:   uuid.NewString(),
-// 			MessageBody: string(bBody),
-// 		},
-// 	); err != nil {
-// 		return err
-// 	}
-
-// 	slog.Warn("event sent directly to DLQ", slog.String(logger.EventBodyKey, string(bBody)),
-// 		slog.String(logger.QueueNameKey, s.queueDLQProcess))
-// 	return nil
-// }

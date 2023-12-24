@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"log"
+	"fmt"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	awssdk "github.com/aws/aws-sdk-go/aws"
@@ -14,15 +14,17 @@ import (
 )
 
 var (
-	queueRetryProcess string
-	queueDLQProcess   string
-	region            string
-	endpoint          string
+	queueRetryProcess  string
+	validEventTopic    string
+	rejectedEventTopic string
+	region             string
+	endpoint           string
 )
 
 func init() {
-	flag.StringVar(&queueRetryProcess, "retry_queue_name", "dispatch_event_processor_retry", "send message to queue when has error")
-	flag.StringVar(&queueDLQProcess, "dlq_queue_name", "dispatch_event_processor_DLQ", "send message to queue when have an incompatible contract")
+	flag.StringVar(&queueRetryProcess, "retry_queue_name", "dispatch_event_processor_retry", "send message to retry queue when has error")
+	flag.StringVar(&validEventTopic, "valid_topic_name", "validated_event", "publish event when event received is valid")
+	flag.StringVar(&rejectedEventTopic, "rejected_topic_name", "validated_event", "publish event when event received not is valid")
 	flag.StringVar(&region, "region", "us-east-1", "region of cloud services")
 	flag.StringVar(&endpoint, "endpoint", "http://localstack:4566", "endpoint of cloud services")
 }
@@ -39,17 +41,22 @@ func main() {
 		Endpoint: &endpoint,
 	})
 	if err != nil {
-		log.Fatalln("could not load aws config", err)
-		return
+		panic(fmt.Sprintf("could not load aws config: %v", err))
 	}
 
 	msgBrotker := aws.NewMessageBroker(sess)
-	persistence := aws.NewPersistence(sess)
+	if err := msgBrotker.CreateRejectEventTopic(rejectedEventTopic); err != nil {
+		panic(fmt.Sprintf("could not start message broker: %v", err))
+	}
+	if err := msgBrotker.CreateValidEventTopic(validEventTopic); err != nil {
+		panic(fmt.Sprintf("could not start message broker: %v", err))
+	}
 
+	persistence := aws.NewPersistence(sess)
 	repo := repository.NewDispatchedEvents(persistence)
 
 	handler := pkg.NewLambdaHandler(pkg.LambdaHandlerInput{
-		QueueRetryProcess: queueRetryProcess, QueueDLQProcess: queueDLQProcess, MsgBroker: msgBrotker, DispatchedEventRepo: repo,
+		QueueRetryProcess: queueRetryProcess, MsgBroker: msgBrotker, DispatchedEventRepo: repo,
 	})
 
 	lambda.Start(handler.Handle)

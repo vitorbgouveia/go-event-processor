@@ -6,7 +6,7 @@ import (
 )
 
 type (
-	DispatchedEvent struct {
+	EventInput struct {
 		Records []EventRecord `json:"Records"`
 	}
 

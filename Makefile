@@ -22,7 +22,7 @@ test-coverage: test # Run all tests and open coverage per file in browser
 	go tool cover -html=coverage.out
 
 mocks-generate: # generate all mocks to use in tests
-	mockgen -source internal/repository/dispached_events.go -destination internal/repository/mocks/dispached_events.go -package mocks
+	mockgen -source internal/repository/events.go -destination internal/repository/mocks/events.go -package mocks
 
-	mockgen -source pkg/aws/sqs.go -destination pkg/aws/mocks/sqs.go -package mocks
+	mockgen -source pkg/aws/messagebroker.go -destination pkg/aws/mocks/messagebroker.go -package mocks
 	mockgen -source pkg/aws/dynamodb.go -destination pkg/aws/mocks/dynamodb.go -package mocks

@@ -16,18 +16,18 @@ type (
 		queueRetryProcess   string
 		queueDLQProcess     string
 		MsgBroker           aws.MessageBroker
-		DispatchedEventRepo repository.DispatchedEvents
+		DispatchedEventRepo repository.Events
 	}
 
 	LambdaHandler interface {
-		Handle(ctx context.Context, event *models.DispatchedEvent) error
+		Handle(ctx context.Context, event *models.EventInput) error
 	}
 
 	LambdaHandlerInput struct {
 		QueueRetryProcess   string
 		QueueDLQProcess     string
 		MsgBroker           aws.MessageBroker
-		DispatchedEventRepo repository.DispatchedEvents
+		DispatchedEventRepo repository.Events
 	}
 )
 
@@ -37,13 +37,12 @@ func NewLambdaHandler(i LambdaHandlerInput) LambdaHandler {
 	}
 }
 
-func (s lambdaHandler) Handle(ctx context.Context, event *models.DispatchedEvent) error {
+func (s lambdaHandler) Handle(ctx context.Context, event *models.EventInput) error {
 	sigCtx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	w := worker.NewDispatchedEventProcessor(&worker.DispatchedEventProcessorInput{
-		MsgBroker: s.MsgBroker, QueueRetryProcess: s.queueRetryProcess,
-		QueueDLQProcess: s.queueDLQProcess, Repo: s.DispatchedEventRepo,
+	w := worker.NewDispatchedEventProcessor(&worker.EventProcessorInput{
+		MsgBroker: s.MsgBroker, QueueRetryProcess: s.queueRetryProcess, Repo: s.DispatchedEventRepo,
 	})
 	if err := w.ProcessEvents(ctx, event, sigCtx.Done()); err != nil {
 		return err

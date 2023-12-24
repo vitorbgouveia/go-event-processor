@@ -16,6 +16,11 @@ import (
 	awsmocks "github.com/vitorbgouveia/go-event-processor/pkg/aws/mocks"
 )
 
+var (
+	retryErr  = errors.New("fail to insert event")
+	insertErr = errors.New("fail to insert event")
+)
+
 func TestHandle(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -25,15 +30,14 @@ func TestHandle(t *testing.T) {
 	eventId := uuid.NewString()
 	validBody := fmt.Sprintf(`{"event_id": "%s", "context": "monitoring", "type": "inbound", "tenant": "%s", "data": "{\"payment\": 2000}"}`, eventId, tenant)
 
-	retryErr := errors.New("fail to insert event")
-	insertErr := errors.New("fail to insert event")
-
 	mockMsgBrotker := awsmocks.NewMockMessageBroker(ctrl)
-	mockMsgBrotker.EXPECT().SendMessage(aws.SendMessageInput{
-		QueueName: "retry_queue", MessageID: messageID, MessageBody: validBody,
+	mockMsgBrotker.EXPECT().SendToQueue(context.Background(), aws.SendToQueueInput{
+		QueueName: "retry_queue", MessageBody: validBody,
 	}).Return(retryErr)
 
-	mockRepo := repomocks.NewMockDispatchedEvents(ctrl)
+	mockMsgBrotker.EXPECT().PublishValidEvent(context.Background(), validBody).Return(nil).MaxTimes(1)
+
+	mockRepo := repomocks.NewMockEvents(ctrl)
 	gomock.InOrder(
 		mockRepo.EXPECT().Insert(repository.EventInsertInput{
 			EventId: eventId, Context: "monitoring", Type: "inbound", Tenant: tenant, Data: `{"payment": 2000}`,
@@ -47,7 +51,7 @@ func TestHandle(t *testing.T) {
 		QueueRetryProcess: "retry_queue", QueueDLQProcess: "dlq_queue",
 		MsgBroker: mockMsgBrotker, DispatchedEventRepo: mockRepo,
 	})
-	event := &models.DispatchedEvent{
+	event := &models.EventInput{
 		Records: []models.EventRecord{
 			{
 				MessageId: messageID,
@@ -62,5 +66,4 @@ func TestHandle(t *testing.T) {
 	err = lh.Handle(context.Background(), event)
 	assert.ErrorContains(t, err, insertErr.Error())
 	assert.ErrorContains(t, err, retryErr.Error())
-
 }

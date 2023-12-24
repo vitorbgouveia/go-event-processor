@@ -13,8 +13,7 @@ services:
     environment:
       # LocalStack configuration: https://docs.localstack.cloud/references/configuration/
       - DEBUG=1
-      # - SERVICES=sns
-      - SERVICES=lambda,iam,dynamodb,sqs
+      - SERVICES=lambda,iam,dynamodb,sqs,sns
       - AWS_DEFAULT_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=testUser
       - AWS_SECRET_ACCESS_KEY=testAccessKey
