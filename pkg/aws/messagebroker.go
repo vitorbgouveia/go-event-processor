@@ -90,7 +90,7 @@ func (s *messagebroker) PublishValidEvent(ctx context.Context, message string) e
 func (s *messagebroker) PublishRejectedEvent(ctx context.Context, message string, errReason error) error {
 	if _, err := s.snsClient.PublishWithContext(ctx, &sns.PublishInput{
 		MessageAttributes: map[string]*sns.MessageAttributeValue{
-			"reason_reject": {StringValue: aws.String(errReason.Error())}},
+			"reason_reject": {StringValue: aws.String(errReason.Error()), DataType: aws.String("String")}},
 		Message:  &message,
 		TopicArn: &s.rejectedEventTopicARN,
 	}); err != nil {

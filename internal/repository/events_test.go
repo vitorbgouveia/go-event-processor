@@ -27,7 +27,7 @@ func TestDispatchedEvents_Insert(t *testing.T) {
 		m.EXPECT().Insert(insertInput).Return(errInsert),
 	)
 
-	repo := NewDispatchedEvents(m)
+	repo := NewValidEvents(m)
 	err := repo.Insert(eventInput)
 	assert.Nil(t, err)
 

@@ -22,9 +22,9 @@ var (
 )
 
 func init() {
-	flag.StringVar(&queueRetryProcess, "retry_queue_name", "dispatch_event_processor_retry", "send message to retry queue when has error")
-	flag.StringVar(&validEventTopic, "valid_topic_name", "validated_event", "publish event when event received is valid")
-	flag.StringVar(&rejectedEventTopic, "rejected_topic_name", "validated_event", "publish event when event received not is valid")
+	flag.StringVar(&queueRetryProcess, "event_processor_retry_queue", "event_processor_retry", "send message to retry queue when has error")
+	flag.StringVar(&validEventTopic, "event_valid_topic", "event_valid", "publish event when event received is valid")
+	flag.StringVar(&rejectedEventTopic, "event_reject_topic", "event_reject", "publish event when event received not is valid")
 	flag.StringVar(&region, "region", "us-east-1", "region of cloud services")
 	flag.StringVar(&endpoint, "endpoint", "http://localstack:4566", "endpoint of cloud services")
 }
@@ -53,7 +53,7 @@ func main() {
 	}
 
 	persistence := aws.NewPersistence(sess)
-	repo := repository.NewDispatchedEvents(persistence)
+	repo := repository.NewValidEvents(persistence)
 
 	handler := pkg.NewLambdaHandler(pkg.LambdaHandlerInput{
 		QueueRetryProcess: queueRetryProcess, MsgBroker: msgBrotker, DispatchedEventRepo: repo,

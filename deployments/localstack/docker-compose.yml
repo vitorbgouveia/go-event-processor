@@ -15,8 +15,8 @@ services:
       - DEBUG=1
       - SERVICES=lambda,iam,dynamodb,sqs,sns
       - AWS_DEFAULT_REGION=us-east-1
-      - AWS_ACCESS_KEY_ID=testUser
-      - AWS_SECRET_ACCESS_KEY=testAccessKey
+      - AWS_ACCESS_KEY_ID=cred_key_id
+      - AWS_SECRET_ACCESS_KEY=cred_secret_key
       - DOCKER_HOST=unix:///var/run/docker.sock
       - LAMBDA_EXECUTOR=local
       - MAIN_DOCKER_NETWORK=l

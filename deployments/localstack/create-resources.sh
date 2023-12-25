@@ -3,27 +3,32 @@
 echo "##### Create SQS queues #####"
 awslocal \
   sqs create-queue \
-  --queue-name dispatch_event_processor_DLQ
+  --queue-name event_processor_DLQ
 
 awslocal \
   sqs create-queue \
-  --queue-name dispatch_event_processor \
-  --attributes '{"RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:000000000000:dispatch_event_processor_DLQ\",\"maxReceiveCount\":\"3\"}"}'
+  --queue-name event_processor \
+  --attributes '{"RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:000000000000:event_processor_DLQ\",\"maxReceiveCount\":\"3\"}"}'
 
 awslocal \
   sqs create-queue \
-  --queue-name dispatch_event_processor_retry \
-  --attributes '{"RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:000000000000:dispatch_event_processor_DLQ\",\"maxReceiveCount\":\"3\"}"}'
+  --queue-name event_processor_retry \
+  --attributes '{"RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:000000000000:event_processor_DLQ\",\"maxReceiveCount\":\"3\"}"}'
 
 echo "##### Create SNS topics #####"
 awslocal \
   sns create-topic \
-  --name order-creation-events \
+  --name event_reject \
+  --region us-east-1
+
+awslocal \
+  sns create-topic \
+  --name event_valid \
   --region us-east-1
 
 echo "##### Create table in DynamoDB #####"
 awslocal dynamodb create-table \
-    --table-name dispatched_events \
+    --table-name valid_events \
     --key-schema AttributeName=event_id,KeyType=HASH \
     --attribute-definitions AttributeName=event_id,AttributeType=S \
     --billing-mode PAY_PER_REQUEST \
@@ -60,13 +65,13 @@ awslocal \
   lambda create-event-source-mapping \
   --function-name event-processor \
   --batch-size 1 \
-  --event-source-arn "arn:aws:sqs:us-east-1:000000000000:dispatch_event_processor"
+  --event-source-arn "arn:aws:sqs:us-east-1:000000000000:event_processor"
 
 echo "##### Map the queue to the lambda function #####"
 awslocal \
   lambda create-event-source-mapping \
   --function-name event-processor \
   --batch-size 1 \
-  --event-source-arn "arn:aws:sqs:us-east-1:000000000000:dispatch_event_processor_retry"
+  --event-source-arn "arn:aws:sqs:us-east-1:000000000000:event_processor_retry"
 
 echo "##### All resources initialized! 🚀 #####"

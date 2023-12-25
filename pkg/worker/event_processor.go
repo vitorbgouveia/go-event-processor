@@ -93,7 +93,7 @@ func (s *eventProcessor) ProcessEvents(ctx context.Context, event *models.EventI
 					return
 				}
 
-				slog.Info("processed dispatched event", slog.String(logger.EventIdKey, messageBody.EventId),
+				slog.Info("event processed", slog.String(logger.EventIdKey, messageBody.EventId),
 					slog.String(logger.MessageIDKey, record.MessageId), slog.Any(logger.EventBodyKey, messageBody))
 				processResult <- nil
 			}

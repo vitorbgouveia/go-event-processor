@@ -22,10 +22,10 @@ type (
 )
 
 const (
-	tableName = "dispatched_events"
+	tableName = "valid_events"
 )
 
-func NewDispatchedEvents(persistence aws.Persistence) Events {
+func NewValidEvents(persistence aws.Persistence) Events {
 	return &events{persistence}
 }
 
