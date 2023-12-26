@@ -7,7 +7,7 @@ setup: # Up localstack and configure all resources with policies.
 	docker-compose -f deployments/localstack/docker-compose.yml up --build
 
 send-events: # Send events to event-processor; Default: --qtd-events-send 2 --event-send-semaphore 10
-	go run cmd/producer/main.go --qtd-events-send 1 --event-send-semaphore 10
+	go run cmd/producer/main.go --qtd-events-send 2 --event-send-semaphore 10
 
 clean-all: # Remove all containers and delete volumes.
 	docker-compose -f deployments/localstack/docker-compose.yml down -v
