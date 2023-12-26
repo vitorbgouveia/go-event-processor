@@ -18,12 +18,12 @@ awslocal \
 echo "##### Create SNS topics #####"
 awslocal \
   sns create-topic \
-  --name event_reject \
+  --name rejected_event \
   --region us-east-1
 
 awslocal \
   sns create-topic \
-  --name event_valid \
+  --name valid_event \
   --region us-east-1
 
 echo "##### Create table in DynamoDB #####"

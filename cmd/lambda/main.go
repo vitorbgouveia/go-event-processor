@@ -23,10 +23,11 @@ var (
 
 func init() {
 	flag.StringVar(&queueRetryProcess, "event_processor_retry_queue", "event_processor_retry", "send message to retry queue when has error")
-	flag.StringVar(&validEventTopic, "event_valid_topic", "event_valid", "publish event when event received is valid")
-	flag.StringVar(&rejectedEventTopic, "event_reject_topic", "event_reject", "publish event when event received not is valid")
+	flag.StringVar(&validEventTopic, "valid_event_topic", "valid_event", "publish event when event received is valid")
+	flag.StringVar(&rejectedEventTopic, "reject_event_topic", "rejected_event", "publish event when event received not is valid")
 	flag.StringVar(&region, "region", "us-east-1", "region of cloud services")
 	flag.StringVar(&endpoint, "endpoint", "http://localstack:4566", "endpoint of cloud services")
+	flag.Parse()
 }
 
 // aws sqs send-message --endpoint-url=http://localhost:4566 --queue-url http://localhost:4576/000000000000/dispatch_event_processor --region us-east-1 --message-body '{Test Message!}'
